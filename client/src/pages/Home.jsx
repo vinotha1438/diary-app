@@ -17,6 +17,8 @@ export default function Home() {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [moodFilter, setMoodFilter] = useState("all");
 
   useEffect(() => {
     api
@@ -70,7 +72,13 @@ export default function Home() {
   };
 
   // Group entries by day
-  const groups = entries.reduce((acc, entry) => {
+    const filtered = entries.filter((e) => {
+    const matchText = e.text.toLowerCase().includes(search.toLowerCase());
+    const matchMood = moodFilter === "all" || e.mood === moodFilter;
+    return matchText && matchMood;
+  });
+
+  const groups = filtered.reduce((acc, entry) => {
     const day = new Date(entry.createdAt).toLocaleDateString("en-IN", {
       weekday: "long",
       day: "numeric",
@@ -123,8 +131,33 @@ export default function Home() {
 
       {error && <p className="error">{error}</p>}
 
+            {entries.length > 0 && (
+        <div className="filters">
+          <input
+            type="text"
+            placeholder="Search your entries..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            value={moodFilter}
+            onChange={(e) => setMoodFilter(e.target.value)}
+          >
+            <option value="all">All moods</option>
+            <option value="happy">😊 Happy</option>
+            <option value="neutral">😐 Neutral</option>
+            <option value="sad">😢 Sad</option>
+            <option value="angry">😡 Angry</option>
+          </select>
+        </div>
+      )}
+
       {entries.length === 0 && (
         <p className="empty">No entries yet. Write your first one above!</p>
+      )}
+
+      {entries.length > 0 && filtered.length === 0 && (
+        <p className="empty">No entries match your search.</p>
       )}
 
       {Object.entries(groups).map(([day, dayEntries]) => (

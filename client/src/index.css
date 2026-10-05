@@ -135,3 +135,16 @@ textarea {
 .entry-mood { position: absolute; top: 10px; right: 12px; font-size: 18px; }
 .entry-text { white-space: pre-wrap; padding-right: 28px; }
 .card-buttons { display: flex; gap: 8px; margin-top: 8px; }
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.filters input { flex: 1; }
+.filters select {
+  padding: 11px 12px;
+  border: 1px solid #d8d3ca;
+  border-radius: 8px;
+  font-size: 15px;
+  background: #fff;
+}
