@@ -1,0 +1,81 @@
+const express = require("express");
+const Entry = require("../models/Entry");
+const auth = require("../middleware/auth");
+
+const router = express.Router();
+
+// Ella routes-kum login venum
+router.use(auth);
+
+// CREATE: pudhu entry
+router.post("/", async (req, res) => {
+  try {
+    const { text, mood, tags } = req.body;
+    if (!text) {
+      return res.status(400).json({ message: "Text is required" });
+    }
+    const entry = await Entry.create({
+      userId: req.userId,
+      text,
+      mood,
+      tags,
+    });
+    res.status(201).json(entry);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// READ: ella entries (?date=2026-10-05 koduthaa andha naal mattum)
+router.get("/", async (req, res) => {
+  try {
+    const filter = { userId: req.userId };
+
+    if (req.query.date) {
+      const start = new Date(req.query.date + "T00:00:00");
+      const end = new Date(req.query.date + "T23:59:59.999");
+      filter.createdAt = { $gte: start, $lte: end };
+    }
+
+    const entries = await Entry.find(filter).sort({ createdAt: -1 });
+    res.json(entries);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// UPDATE: entry edit
+router.put("/:id", async (req, res) => {
+  try {
+    const { text, mood, tags } = req.body;
+    const entry = await Entry.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      { text, mood, tags },
+      { new: true, runValidators: true }
+    );
+    if (!entry) {
+      return res.status(404).json({ message: "Entry not found" });
+    }
+    res.json(entry);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// DELETE: entry delete
+router.delete("/:id", async (req, res) => {
+  try {
+    const entry = await Entry.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId,
+    });
+    if (!entry) {
+      return res.status(404).json({ message: "Entry not found" });
+    }
+    res.json({ message: "Entry deleted" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+module.exports = router;
