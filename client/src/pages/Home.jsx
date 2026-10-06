@@ -71,13 +71,13 @@ export default function Home() {
     }
   };
 
-  // Group entries by day
-    const filtered = entries.filter((e) => {
+  const filtered = entries.filter((e) => {
     const matchText = e.text.toLowerCase().includes(search.toLowerCase());
     const matchMood = moodFilter === "all" || e.mood === moodFilter;
     return matchText && matchMood;
   });
 
+  // Group entries by day
   const groups = filtered.reduce((acc, entry) => {
     const day = new Date(entry.createdAt).toLocaleDateString("en-IN", {
       weekday: "long",
@@ -131,7 +131,7 @@ export default function Home() {
 
       {error && <p className="error">{error}</p>}
 
-            {entries.length > 0 && (
+      {entries.length > 0 && (
         <div className="filters">
           <input
             type="text"
