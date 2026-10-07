@@ -397,3 +397,33 @@
   border: 8px solid #fff;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 }
+
+/* ---------- extra mobile polish ---------- */
+@media (max-width: 600px) {
+  .pk { padding: 56px 10px 24px; }
+
+  .pk-top { flex-direction: column; align-items: flex-start; }
+  .pk-week { width: 100%; }
+  .pk-day { width: 46px; flex-shrink: 0; }
+
+  .pk-cover { padding: 8px; border-radius: 14px; margin-top: 16px; }
+  .pk-page { padding: 20px 14px 72px; }
+  .pk-left::before { left: 14px; width: 70px; }
+
+  .pk-bignum { font-size: 60px; }
+  .pk-weekday { font-size: 26px; }
+
+  .pk .pk-write { font-size: 22px; }
+  .pk-text { font-size: 22px; }
+  .pk-dear { font-size: 36px; }
+
+  .pk-emoji { padding: 3px 6px; font-size: 18px; }
+
+  .pk-add { flex-wrap: wrap; gap: 8px; }
+  .pk-photo-btn { margin-right: 0; flex: 1 1 100%; }
+  .pk-add button { flex: 1; }
+
+  .pk-polaroid img { width: 92px; height: 92px; }
+  .pk-ribbon { right: 20px; }
+  .pk-foot { left: 14px; right: 14px; }
+}
