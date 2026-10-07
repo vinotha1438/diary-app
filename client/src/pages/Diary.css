@@ -460,3 +460,20 @@
   .pk-add .pk-photo-btn { flex: 1 1 100%; margin-right: 0; }
   .pk-add button { flex: 1; }
 }
+
+.pk-time-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.pk .pk-time-pick input {
+  padding: 4px 8px;
+  border: 1px solid #d8ccb2;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+}

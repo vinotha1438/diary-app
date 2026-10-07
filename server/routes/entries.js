@@ -9,7 +9,7 @@ router.use(auth);
 // CREATE
 router.post("/", async (req, res) => {
   try {
-    const { text, mood, tags, photos } = req.body;
+    const { text, mood, tags, photos, date } = req.body;
     if (!text) {
       return res.status(400).json({ message: "Text is required" });
     }
@@ -20,13 +20,31 @@ router.post("/", async (req, res) => {
           .slice(0, 4)
       : [];
 
-    const entry = await Entry.create({
+    const data = {
       userId: req.userId,
       text,
       mood,
       tags,
       photos: cleanPhotos,
-    });
+    };
+
+    // Optional: choose the day and time the entry belongs to
+    if (date) {
+      const d = new Date(date);
+      const now = new Date();
+      const oldest = new Date();
+      oldest.setFullYear(now.getFullYear() - 20);
+      if (
+        isNaN(d) ||
+        d > new Date(now.getTime() + 5 * 60 * 1000) ||
+        d < oldest
+      ) {
+        return res.status(400).json({ message: "Invalid date" });
+      }
+      data.createdAt = d;
+    }
+
+    const entry = await Entry.create(data);
     res.status(201).json(entry);
   } catch (err) {
     console.log("Create entry error:", err.message);

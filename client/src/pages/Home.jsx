@@ -52,6 +52,7 @@ export default function Home() {
   const [entries, setEntries] = useState([]);
   const [selected, setSelected] = useState(() => startOfDay(new Date()));
   const [text, setText] = useState("");
+  const [entryTime, setEntryTime] = useState("");
   const [photos, setPhotos] = useState([]);
   const [lightbox, setLightbox] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -63,6 +64,7 @@ export default function Home() {
 
   const today = startOfDay(new Date());
   const isToday = dayKey(selected) === dayKey(today);
+  const canWrite = selected <= today;
 
   useEffect(() => {
     api
@@ -165,13 +167,45 @@ export default function Home() {
 
   const addEntry = async () => {
     if (!text.trim() && photos.length === 0) return;
+
+    const now = new Date();
+    let when;
+
+    if (entryTime) {
+      // Use the time the person picked
+      const [h, m] = entryTime.split(":").map(Number);
+      when = new Date(
+        selected.getFullYear(),
+        selected.getMonth(),
+        selected.getDate(),
+        h,
+        m
+      );
+    } else if (!isToday) {
+      // Past day with no time picked: use the current clock time
+      when = new Date(
+        selected.getFullYear(),
+        selected.getMonth(),
+        selected.getDate(),
+        now.getHours(),
+        now.getMinutes()
+      );
+    }
+
+    if (when && when > now) {
+      setError("That time is in the future. Pick an earlier time.");
+      return;
+    }
+
     try {
       const res = await api.post("/entries", {
         text: text.trim() || "📷",
         photos,
+        date: when ? when.toISOString() : undefined,
       });
       setEntries([res.data, ...entries]);
       setText("");
+      setEntryTime("");
       setPhotos([]);
       setShowPicker(false);
       setError("");
@@ -289,7 +323,7 @@ export default function Home() {
                   <figcaption>{m.time}</figcaption>
                 </figure>
               ))}
-              {isToday && (
+              {canWrite && (
                 <button
                   type="button"
                   className="pk-addphoto"
@@ -300,7 +334,7 @@ export default function Home() {
                   Add photo
                 </button>
               )}
-              {!isToday && moments.length === 0 && (
+              {!canWrite && moments.length === 0 && (
                 <p className="pk-hint">No photos on this day.</p>
               )}
             </div>
@@ -337,7 +371,7 @@ export default function Home() {
                 <p className="pk-empty">
                   {isToday
                     ? "Nothing written yet. Start your page below."
-                    : "No entries on this day."}
+                    : "No entries on this day. Write one below."}
                 </p>
               )}
 
@@ -389,7 +423,7 @@ export default function Home() {
                 </div>
               ))}
 
-              {isToday && (
+              {canWrite && (
                 <div className="pk-compose">
                   <div className="pk-emoji-bar">
                     <span className="pk-tapadd">Tap to add</span>
@@ -430,7 +464,11 @@ export default function Home() {
                     ref={taRef}
                     className="pk-write"
                     rows={4}
-                    placeholder="What's happening right now?"
+                    placeholder={
+                      isToday
+                        ? "What's happening right now?"
+                        : "What happened on this day?"
+                    }
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                   />
@@ -453,6 +491,24 @@ export default function Home() {
                       ))}
                     </div>
                   )}
+
+                  <label className="pk-time-pick">
+                    🕒 Time it happened
+                    <input
+                      type="time"
+                      value={entryTime}
+                      onChange={(e) => setEntryTime(e.target.value)}
+                    />
+                    {entryTime && (
+                      <button
+                        type="button"
+                        className="pk-link"
+                        onClick={() => setEntryTime("")}
+                      >
+                        Use now
+                      </button>
+                    )}
+                  </label>
 
                   <div className="pk-add">
                     <button

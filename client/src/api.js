@@ -11,4 +11,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// If the token is invalid or expired, log the user out
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const isAuthRoute = err.config?.url?.startsWith("/auth/");
+    if (err.response?.status === 401 && !isAuthRoute) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+
 export default api;
