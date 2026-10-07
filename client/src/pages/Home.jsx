@@ -6,6 +6,7 @@ import "./Diary.css";
 
 const APP_NAME = "Pakkam";
 const TAGLINE = "Your day, in your own words.";
+const MAX_PHOTOS = 4;
 
 const QUICK_EMOJIS = [
   "😊", "😔", "😴", "🥰", "😂", "😡",
@@ -18,16 +19,42 @@ const addDays = (d, n) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
+// Shrink a photo in the browser before uploading
+const compressImage = (file, maxSize = 900, quality = 0.7) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas
+          .getContext("2d")
+          .drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
 export default function Home() {
   const { user, logout } = useAuth();
   const [entries, setEntries] = useState([]);
   const [selected, setSelected] = useState(() => startOfDay(new Date()));
   const [text, setText] = useState("");
+  const [photos, setPhotos] = useState([]);
+  const [lightbox, setLightbox] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [error, setError] = useState("");
   const taRef = useRef(null);
+  const fileRef = useRef(null);
 
   const today = startOfDay(new Date());
   const isToday = dayKey(selected) === dayKey(today);
@@ -77,12 +104,35 @@ export default function Home() {
     });
   };
 
-  const addEntry = async () => {
-    if (!text.trim()) return;
+  const handlePhotos = async (e) => {
+    const files = Array.from(e.target.files).slice(
+      0,
+      MAX_PHOTOS - photos.length
+    );
+    e.target.value = "";
+    if (files.length === 0) return;
     try {
-      const res = await api.post("/entries", { text });
+      const compressed = await Promise.all(files.map((f) => compressImage(f)));
+      setPhotos((p) => [...p, ...compressed]);
+      setError("");
+    } catch {
+      setError("Could not read that photo. Try a JPG or PNG.");
+    }
+  };
+
+  const removePhoto = (index) =>
+    setPhotos(photos.filter((_, i) => i !== index));
+
+  const addEntry = async () => {
+    if (!text.trim() && photos.length === 0) return;
+    try {
+      const res = await api.post("/entries", {
+        text: text.trim() || "📷",
+        photos,
+      });
       setEntries([res.data, ...entries]);
       setText("");
+      setPhotos([]);
       setShowPicker(false);
       setError("");
     } catch {
@@ -214,7 +264,42 @@ export default function Home() {
                   onChange={(e) => setText(e.target.value)}
                 />
 
+                {photos.length > 0 && (
+                  <div className="pk-previews">
+                    {photos.map((src, i) => (
+                      <div key={i} className="pk-preview">
+                        <img src={src} alt="Selected" />
+                        <button
+                          type="button"
+                          className="pk-remove"
+                          onClick={() => removePhoto(i)}
+                          title="Remove photo"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={handlePhotos}
+                />
+
                 <div className="pk-add">
+                  <button
+                    type="button"
+                    className="pk-photo-btn"
+                    disabled={photos.length >= MAX_PHOTOS}
+                    onClick={() => fileRef.current.click()}
+                  >
+                    📷 Add photo ({photos.length}/{MAX_PHOTOS})
+                  </button>
                   <button onClick={addEntry}>Add entry</button>
                 </div>
               </div>
@@ -309,12 +394,32 @@ export default function Home() {
                       </div>
                     </>
                   )}
+
+                  {entry.photos?.length > 0 && (
+                    <div className="pk-photos">
+                      {entry.photos.map((src, i) => (
+                        <figure key={i} className="pk-polaroid">
+                          <img
+                            src={src}
+                            alt="Diary"
+                            onClick={() => setLightbox(src)}
+                          />
+                        </figure>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </section>
         </main>
       </div>
+
+      {lightbox && (
+        <div className="pk-lightbox" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="Diary full size" />
+        </div>
+      )}
     </div>
   );
 }

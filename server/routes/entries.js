@@ -4,29 +4,37 @@ const auth = require("../middleware/auth");
 
 const router = express.Router();
 
-// Ella routes-kum login venum
 router.use(auth);
 
-// CREATE: pudhu entry
+// CREATE
 router.post("/", async (req, res) => {
   try {
-    const { text, mood, tags } = req.body;
+    const { text, mood, tags, photos } = req.body;
     if (!text) {
       return res.status(400).json({ message: "Text is required" });
     }
+
+    const cleanPhotos = Array.isArray(photos)
+      ? photos
+          .filter((p) => typeof p === "string" && p.startsWith("data:image/"))
+          .slice(0, 4)
+      : [];
+
     const entry = await Entry.create({
       userId: req.userId,
       text,
       mood,
       tags,
+      photos: cleanPhotos,
     });
     res.status(201).json(entry);
   } catch (err) {
+    console.log("Create entry error:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// READ: ella entries (?date=2026-10-05 koduthaa andha naal mattum)
+// READ
 router.get("/", async (req, res) => {
   try {
     const filter = { userId: req.userId };
@@ -44,7 +52,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// UPDATE: entry edit
+// UPDATE (text only, photos stay as they are)
 router.put("/:id", async (req, res) => {
   try {
     const { text, mood, tags } = req.body;
@@ -62,7 +70,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE: entry delete
+// DELETE
 router.delete("/:id", async (req, res) => {
   try {
     const entry = await Entry.findOneAndDelete({
