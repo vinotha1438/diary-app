@@ -8,10 +8,11 @@ const entrySchema = new mongoose.Schema(
       required: true,
     },
     text: { type: String, required: true, trim: true },
-    mood: {
+      mood: {
       type: String,
-      enum: ["happy", "neutral", "sad", "angry"],
-      default: "neutral",
+      default: "😌",
+      trim: true,
+      maxlength: 16,
     },
     tags: [{ type: String, trim: true }],
   },
