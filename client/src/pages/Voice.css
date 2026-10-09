@@ -1,0 +1,62 @@
+.pk-voice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.pk-voice-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pk-voice-btn.on { background: var(--pen); }
+.pk-voice-btn:disabled { opacity: 0.4; cursor: default; }
+
+.pk-voice-lang { display: flex; gap: 6px; }
+.pk-voice-lang button {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid #cdbf9f;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pk-voice-lang button.on {
+  background: var(--pen);
+  border-color: var(--pen);
+  color: #fff;
+}
+.pk-voice-lang button:disabled { opacity: 0.5; cursor: default; }
+
+.pk-voice-note { font-size: 13px; color: var(--muted); }
+
+.pk-voice-live {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.pk-rec-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pk-pulse 1.2s infinite;
+}
+@keyframes pk-pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) {
+  .pk-rec-dot { animation: none; }
+}

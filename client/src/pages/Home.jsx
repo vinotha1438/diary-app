@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import EmojiPicker from "emoji-picker-react";
 import api from "../api";
+import { uploadImage } from "../cloudinary";
+import useSpeechToText from "../useSpeechToText";
 import { useAuth } from "../AuthContext";
 import "./Diary.css";
+import "./Voice.css";
 
 const APP_NAME = "Pakkam";
 const TAGLINE = "My day, my story.";
@@ -24,27 +27,29 @@ const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 const dayOfYear = (d) =>
   Math.floor((startOfDay(d) - new Date(d.getFullYear(), 0, 0)) / 86400000);
 
-// Shrink a photo in the browser before uploading
+// Shrink a photo in the browser, then upload it (returns a Blob)
 const compressImage = (file, maxSize = 900, quality = 0.7) =>
   new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas
-          .getContext("2d")
-          .drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.src = reader.result;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read image"));
     };
-    reader.readAsDataURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Compress failed"))),
+        "image/jpeg",
+        quality
+      );
+    };
+    img.src = url;
   });
 
 export default function Home() {
@@ -54,11 +59,18 @@ export default function Home() {
   const [text, setText] = useState("");
   const [entryTime, setEntryTime] = useState("");
   const [photos, setPhotos] = useState([]);
+  const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [error, setError] = useState("");
+  const [voiceLang, setVoiceLang] = useState("ta-IN");
+  const speech = useSpeechToText({
+    // add each spoken sentence at the end of the entry
+    onFinal: (chunk) =>
+      setText((t) => (t && !/\s$/.test(t) ? t + " " : t) + chunk.trim()),
+  });
   const taRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -156,16 +168,22 @@ export default function Home() {
     );
     e.target.value = "";
     if (files.length === 0) return;
+    setUploading(true);
     try {
-      const compressed = await Promise.all(files.map((f) => compressImage(f)));
-      setPhotos((p) => [...p, ...compressed]);
+      const urls = await Promise.all(
+        files.map(async (f) => uploadImage(await compressImage(f)))
+      );
+      setPhotos((p) => [...p, ...urls]);
       setError("");
     } catch {
-      setError("Could not read that photo. Try a JPG or PNG.");
+      setError("Could not upload that photo. Check your connection and try again.");
+    } finally {
+      setUploading(false);
     }
   };
 
   const addEntry = async () => {
+    speech.stop();
     if (!text.trim() && photos.length === 0) return;
 
     const now = new Date();
@@ -327,11 +345,11 @@ export default function Home() {
                 <button
                   type="button"
                   className="pk-addphoto"
-                  disabled={photos.length >= MAX_PHOTOS}
+                  disabled={photos.length >= MAX_PHOTOS || uploading}
                   onClick={() => fileRef.current.click()}
                 >
                   <span>＋</span>
-                  Add photo
+                  {uploading ? "Uploading…" : "Add photo"}
                 </button>
               )}
               {!canWrite && moments.length === 0 && (
@@ -473,6 +491,13 @@ export default function Home() {
                     onChange={(e) => setText(e.target.value)}
                   />
 
+                  {speech.listening && (
+                    <div className="pk-voice-live" aria-live="polite">
+                      <span className="pk-rec-dot" />
+                      <span>Listening… {speech.interim}</span>
+                    </div>
+                  )}
+
                   {photos.length > 0 && (
                     <div className="pk-previews">
                       {photos.map((src, i) => (
@@ -510,16 +535,55 @@ export default function Home() {
                     )}
                   </label>
 
+                  <div className="pk-voice">
+                    <button
+                      type="button"
+                      className={`pk-voice-btn${speech.listening ? " on" : ""}`}
+                      disabled={!speech.supported}
+                      onClick={() =>
+                        speech.listening ? speech.stop() : speech.start(voiceLang)
+                      }
+                    >
+                      {speech.listening ? "⏹ Stop" : "🎙️ Speak"}
+                    </button>
+                    <div className="pk-voice-lang" role="group" aria-label="Speaking language">
+                      <button
+                        type="button"
+                        className={voiceLang === "ta-IN" ? "on" : ""}
+                        disabled={speech.listening}
+                        onClick={() => setVoiceLang("ta-IN")}
+                      >
+                        தமிழ்
+                      </button>
+                      <button
+                        type="button"
+                        className={voiceLang === "en-IN" ? "on" : ""}
+                        disabled={speech.listening}
+                        onClick={() => setVoiceLang("en-IN")}
+                      >
+                        English
+                      </button>
+                    </div>
+                    {!speech.supported && (
+                      <span className="pk-voice-note">Voice typing works in Chrome or Edge</span>
+                    )}
+                  </div>
+                  {speech.error && <p className="pk-error">{speech.error}</p>}
+
                   <div className="pk-add">
                     <button
                       type="button"
                       className="pk-photo-btn"
-                      disabled={photos.length >= MAX_PHOTOS}
+                      disabled={photos.length >= MAX_PHOTOS || uploading}
                       onClick={() => fileRef.current.click()}
                     >
-                      📷 Photo ({photos.length}/{MAX_PHOTOS})
+                      {uploading
+                        ? "Uploading…"
+                        : `📷 Photo (${photos.length}/${MAX_PHOTOS})`}
                     </button>
-                    <button onClick={addEntry}>Add entry</button>
+                    <button onClick={addEntry} disabled={uploading}>
+                      Add entry
+                    </button>
                   </div>
                 </div>
               )}
