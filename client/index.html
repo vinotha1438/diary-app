@@ -1,26 +1,107 @@
-<!doctype html>
-<html lang="en">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Duty Diary</title><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0f6b5f">
+<link rel="stylesheet" href="index.css"></head><body><div id="app"></div><div id="sh" hidden></div>
+<nav><button id="n-cal" onclick="go('cal')"><span>📅</span>Calendar</button><button id="n-sum" onclick="go('sum')"><span>📊</span>Summary</button><button id="n-shr" onclick="go('shr')"><span>📤</span>Send</button><button id="n-set" onclick="go('set')"><span>⚙️</span>Settings</button></nav>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const defShifts=()=>[{k:'A',s:'07:00',e:'14:00',h:7,c:'#d99a06'},{k:'B',s:'14:00',e:'21:00',h:7,c:'#e0662f'},{k:'G',s:'09:00',e:'18:00',h:10,c:'#1f9d6b'},{k:'C',s:'21:00',e:'07:00',h:10,c:'#7a55c9'}];
+const pal=['#2b7fd1','#c2447a','#8a6d3b','#2a9d9d','#9b59b6'];
+let S=null;try{S=JSON.parse(localStorage.getItem('shiftTracker')||'null')}catch(e){}
+const now=new Date();
+if(!S||!S.p)S={cur:0,tab:'cal',inc:true,ym:[now.getFullYear(),now.getMonth()],p:[{name:'Husband (BMS)',shifts:defShifts(),combos:{'A+B':15,'B+C':15},rate:0,d:{}}]};
+let U=null,U0=false,tm,auth,db;
+const BRAND='<div class="brand"><img src="icon.svg" alt=""><div><b>Duty Diary</b><small>Track your shifts, hours and salary</small></div></div>';
+const isT=d=>{const t=new Date();return t.getFullYear()==S.ym[0]&&t.getMonth()==S.ym[1]&&t.getDate()==d};
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-     <title>My Diary</title>
-   <link rel="manifest" href="/manifest.json" />
-   <link rel="icon" href="/icon-192.png" />
-   <link rel="apple-touch-icon" href="/icon-192.png" />
-   <meta name="theme-color" content="#6366f1" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-  href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=Kavivanar&family=Playfair+Display:wght@600;700&display=swap"
-  rel="stylesheet"
-  />
-</head>
+const ordn=n=>n+(['th','st','nd','rd'][(n%10>3||Math.floor(n%100/10)==1)?0:n%10]);
+function ntx(p){const k=ymk(),cur=(p.sal||{})[k]||{};let wo=0,lv=0,tot=0,h=0,n15=0,n10=0,c={};
+mon(p).forEach(([d,v])=>{if(v[0]=='WO')wo++;else if(v[0]=='L')lv++;else{tot+=v.length;const x=hrs(p,v);h+=x;if(x==15)n15++;if(x==10)n10++;const q=v.join('+');c[q]=(c[q]||0)+1}});
+const pre=['A','B','A+B','B+C'],so=['A','B','C','G',...p.shifts.map(s=>s.k).filter(k=>!'ABCG'.includes(k))],rk=q=>{const i=pre.indexOf(q);return i>=0?i:q.includes('+')?4:5+so.indexOf(q)};
+const m=new Date(S.ym[0],S.ym[1]).toLocaleString('en',{month:'short'}),yy=String(S.ym[0]).slice(2);
+let L=[`${ordn(S.ym[1]+1)} month ${m} ${yy} salary [ ${cur.a?cur.a.toLocaleString('en-IN'):'amount'} - ${cur.d||'date'} ]`,`${tot} - total shift`,`${n15} - 15 hour shift`,`${n10} - 10 hour shift`];
+Object.keys(c).sort((x,y)=>rk(x)-rk(y)).forEach(q=>L.push(`${c[q]} - ${q} shift`));L.push(`{ ${wo} week off }`);if(lv)L.push(`{ ${lv} leave }`);L.push(`${h} - total hours`);return L.join('\n')}
+function ntc(){return `<div class="card"><h3>Copy for notes</h3><div class="mu">Your notes format. Tap Copy and paste it into your notes. Save the salary amount and date in the Salary card above.</div><pre id="nt" style="white-space:pre-wrap;font:13px/1.7 ui-monospace,monospace;background:var(--bg);border-radius:12px;padding:10px;margin:8px 0">${esc(ntx(P()))}</pre><button class="pr" onclick="cpn()">Copy</button> <span class="mu" id="nm"></span></div>`}
+function cpn(){const t=$('#nt');try{navigator.clipboard.writeText(t.textContent)}catch(e){const r=document.createRange();r.selectNodeContents(t);const g=getSelection();g.removeAllRanges();g.addRange(r);document.execCommand('copy')}$('#nm').textContent='Copied'}
+function mig(){S.p.forEach(p=>{p.combos=p.combos||{};if(p.combos['B+C']==null)p.combos['B+C']=15;if(p.combos['A+B']==null)p.combos['A+B']=15})}
+const ymk=()=>`${S.ym[0]}-${pad(S.ym[1]+1)}`;
+function hrsOf(p,k){let t=0;for(const d in p.d)if(d.startsWith(k+'-'))t+=hrs(p,p.d[d]);return t}
+function recs(p){return Object.entries(p.sal||{}).map(([k,v])=>{const h=v.h>0?v.h:hrsOf(p,k);return{k,a:v.a,h,r:h>0?v.a/h:0}}).sort((a,b)=>b.k.localeCompare(a.k))}
+function estSal(p,k){const r=recs(p).filter(x=>x.k<k&&x.a>0).slice(0,3);if(!r.length)return null;const a=r.map(x=>x.a);return{v:a.reduce((x,y)=>x+y,0)/a.length,lo:Math.min(...a),hi:Math.max(...a),n:r.length}}
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function pdh(t){const m=(t||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(!m)return t?esc(t):'-';let y=+m[3];if(y<100)y+=2000;const d=new Date(y,+m[2]-1,+m[1]);return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}<br><small class="mu">${DAYS[d.getDay()]}</small>`}
+function salChart(rs){const a=rs.slice(0,12).reverse();if(a.length<2)return'';const W=320,H=130,P2=26,v=a.map(x=>x.a),lo=Math.min(...v),hi=Math.max(...v),sp=(W-2*P2)/(a.length-1),y=n=>hi==lo?H/2:H-24-(n-lo)/(hi-lo)*(H-54);
+const pts=a.map((x,i)=>[P2+i*sp,y(x.a)]),mn=k=>new Date(+k.slice(0,4),+k.slice(5,7)-1).toLocaleString('en',{month:'short'});
+return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;margin-top:8px"><polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--ac)" stroke-width="2"/>`+pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--ac)"/><text x="${p[0]}" y="${p[1]-8}" text-anchor="middle" style="font-size:9px;fill:var(--tx)">${(a[i].a/1000).toFixed(1)}k</text><text x="${p[0]}" y="${H-6}" text-anchor="middle" style="font-size:9px;fill:var(--mu)">${mn(a[i].k)}</text>`).join('')+`</svg>`}
+function salCard(p,s){const k=ymk(),e=estSal(p,k),cur=(p.sal||{})[k],f=n=>'₹'+Math.round(n).toLocaleString('en-IN');let h='';
+if(e)h+=`<div class="big">${f(e.v)}</div><div class="mu">Estimate from your last ${e.n} month${e.n>1?'s':''}. Usually between ${f(e.lo)} and ${f(e.hi)}.</div>`;
+else if(p.rate>0)h+=`<div class="big">${f(s.h*p.rate)}</div><div class="mu">${s.h} hrs × ${f(p.rate)}/hr</div>`;
+else h+=`<div class="mu">Save the actual salary after you receive it. The app will then estimate the next month.</div>`;
+if(cur){const d=e?cur.a-e.v:null;h+=`<p>Actual: <b>${f(cur.a)}</b>${d!=null?`<br>Difference from estimate: <b style="color:${d>=0?'#1f9d6b':'#d64545'}">${d>=0?'+':'-'}${f(Math.abs(d))}</b>`:''}</p>`}
+h+=`<div class="row"><input id="sa" type="number" placeholder="Actual salary received" value="${cur?cur.a:''}"><input id="sh" type="number" placeholder="Hours (auto ${s.h})" value="${cur&&cur.h?cur.h:''}"></div><div class="row"><input id="sd" placeholder="Paid date, e.g. 10/10/2026" value="${cur&&cur.d?cur.d:''}"><button class="pr" onclick="ss()">Save</button></div>`;
+const rs=recs(p);if(rs.length)h+=salChart(rs)+`<table style="margin-top:8px"><tr><th>Month</th><th>Paid on</th><th>Hours</th><th>Salary</th></tr>`+rs.map(x=>`<tr><td>${new Date(+x.k.slice(0,4),+x.k.slice(5,7)-1).toLocaleString('en',{month:'short',year:'numeric'})}</td><td>${pdh(p.sal[x.k].d)}</td><td>${x.h||'-'}</td><td>${f(x.a)}</td></tr>`).join('')+`</table>`;
+return h}
+function ss(){const a=+$('#sa').value,h=+$('#sh').value,p=P();p.sal=p.sal||{};if(a>0)p.sal[ymk()]={a,h:h>0?h:0,d:$('#sd').value.trim()};else delete p.sal[ymk()];R()}
 
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
-</body>
-
-</html>
+function bn(){const t=new Date();if(t.getFullYear()!=S.ym[0]||t.getMonth()!=S.ym[1])return'';const d=t.getDate(),last=new Date(S.ym[0],S.ym[1]+1,0).getDate();let h='';const b=(x,y)=>`<div class="card" style="display:flex;gap:8px;align-items:center;margin:0 0 8px"><span style="flex:1">${x}</span>${y}</div>`;if(!P().d[key(d)])h+=b(`Today's shift (${d}) is not noted yet`,`<button class="pr" onclick="op(${d})">Note</button>`);if(d>=last-2)h+=b('Month is ending. Send the list to your manager?',`<button onclick="go('shr')">Send</button>`);return h}
+function ev(){if(S.p.length<2)return'';return `<div class="card"><h3>Everyone, ${mname()}</h3><table><tr><th>Person</th><th>Days</th><th>Hours</th></tr>`+S.p.map(p=>{const s=stats(p);return `<tr><td>${esc(p.name)}</td><td>${s.work}</td><td>${s.h}</td></tr>`}).join('')+`</table></div>`}
+function rm(k){const [hh,mm]=($('#rt').value||'21:00').split(':').map(Number),t=new Date();let h2=hh,m2=mm+15;if(m2>=60){m2-=60;h2=(h2+1)%24}const day=k?new Date(t.getFullYear(),t.getMonth()+1,0):t,ds=`${day.getFullYear()}${pad(day.getMonth()+1)}${pad(day.getDate())}`;const tx=k?'Duty Diary: month end. Send the shift list to your manager':"Duty Diary: did you note today's shift? What is tomorrow's shift?",rr=k?'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1':'RRULE:FREQ=DAILY';const u='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(tx)+'&details='+encodeURIComponent('Open: '+location.href)+'&dates='+ds+'T'+pad(hh)+pad(mm)+'00/'+ds+'T'+pad(h2)+pad(m2)+'00&recur='+encodeURIComponent(rr);window.open(u,'_blank')}
+const save=()=>{try{localStorage.setItem('shiftTracker',JSON.stringify(S))}catch(e){}if(U){clearTimeout(tm);tm=setTimeout(()=>db.collection('users').doc(U.uid).set({s:JSON.stringify(S)}).catch(()=>{}),800)}};
+const P=()=>S.p[S.cur],key=d=>`${S.ym[0]}-${pad(S.ym[1]+1)}-${pad(d)}`;
+const spec={WO:['Week Off','#d64545'],L:['Leave','#6b7280']};
+const col=(p,v)=>spec[v[0]]?spec[v[0]][1]:(p.shifts.find(s=>s.k==v[0])||{c:'#888'}).c;
+const lab=v=>spec[v[0]]?spec[v[0]][0]:v.join('+')+' Shift';
+const hrs=(p,v)=>{if(spec[v[0]])return 0;const k=v.join('+');if(p.combos[k]!=null)return +p.combos[k];return v.reduce((a,c)=>a+(+(p.shifts.find(s=>s.k==c)||{}).h||0),0)};
+const mname=()=>new Date(S.ym[0],S.ym[1]).toLocaleString('en',{month:'long'});
+const mon=(p=P())=>{const out=[],n=new Date(S.ym[0],S.ym[1]+1,0).getDate();for(let d=1;d<=n;d++){const v=p.d[key(d)];if(v)out.push([d,v])}return out};
+function stats(p=P()){const g={};let work=0,wo=0,lv=0,h=0;mon(p).forEach(([d,v])=>{const l=lab(v),x=hrs(p,v);g[l]=g[l]||{n:0,h:0};g[l].n++;g[l].h+=x;h+=x;if(v[0]=='WO')wo++;else if(v[0]=='L')lv++;else work++});return{g,work,wo,lv,h}}
+function go(t){S.tab=t;R()}
+function mv(x){let[y,m]=S.ym;m+=x;if(m<0){m=11;y--}if(m>11){m=0;y++}S.ym=[y,m];R()}
+function cal(){const p=P(),[y,m]=S.ym,first=(new Date(y,m,1).getDay()+6)%7,n=new Date(y,m+1,0).getDate(),s=stats();
+let h=bn()+`<div class="mh"><button onclick="mv(-1)">‹</button><b>${mname()} ${y}</b><button onclick="mv(1)">›</button></div><div class="g">`+[...'MTWTFSS'].map(x=>`<i>${x}</i>`).join('')+'<u></u>'.repeat(first);
+for(let d=1;d<=n;d++){const v=p.d[key(d)];h+=`<div class="c${isT(d)?' td':''}" onclick="op(${d})"><span>${d}</span>${v?`<em style="background:${col(p,v)}">${v.join('+')}</em>`:''}</div>`}
+return h+`</div><div class="row"><button onclick="rg()">Fill many days at once</button></div><p class="mu">Working ${s.work} · Week off ${s.wo} · Leave ${s.lv} · ${s.h} hrs</p>`}
+let D=0,T=[],RM=false,RC=false,RA=[1,1],fr=1,to=1;
+function op(d){RM=false;D=d;T=[...(P().d[key(d)]||[])];sh()}
+function sh(){const p=P();$('#sh').innerHTML=`<div class="bd" onclick="cl()"></div><div class="sp"><b>${D} ${mname()} ${S.ym[0]}</b><div class="bt">`+p.shifts.map(s=>`<button class="${T.includes(s.k)?'on':''}" style="--c:${s.c}" onclick="tg('${s.k}')">${s.k}<small>${s.s}-${s.e}</small></button>`).join('')+`</div><div class="bt"><button style="--c:#d64545" onclick="pk(['WO'])">Week Off</button><button style="--c:#6b7280" onclick="pk(['L'])">Leave</button></div><div class="bt"><button onclick="pk([])">Clear</button><button class="pr" onclick="pk(T)">Save ${T.join('+')}</button></div></div>`;$('#sh').hidden=false}
+function tg(k){if(spec[T[0]])T=[];T=T.includes(k)?T.filter(x=>x!=k):[...T,k];const o=P().shifts.map(s=>s.k);T.sort((a,b)=>o.indexOf(a)-o.indexOf(b));RM?rgs():sh()}
+function rg(){const t=new Date(),n=new Date(S.ym[0],S.ym[1]+1,0).getDate();RM=true;RC=false;T=[];fr=1;to=(t.getFullYear()==S.ym[0]&&t.getMonth()==S.ym[1])?t.getDate():n;rgs()}
+function rgs(){if(RC){rcf();return}const p=P(),n=new Date(S.ym[0],S.ym[1]+1,0).getDate();$('#sh').innerHTML=`<div class="bd" onclick="cl()"></div><div class="sp"><b>Fill many days: ${mname()} ${S.ym[0]}</b><div class="row"><input type="number" min="1" max="${n}" placeholder="From day" value="${fr}" oninput="fr=+this.value"><input type="number" min="1" max="${n}" placeholder="To day" value="${to}" oninput="to=+this.value"></div><div class="bt">`+p.shifts.map(s=>`<button class="${T.includes(s.k)?'on':''}" style="--c:${s.c}" onclick="tg('${s.k}')">${s.k}<small>${s.s}-${s.e}</small></button>`).join('')+`</div><div class="bt"><button class="${T[0]=='WO'?'on':''}" style="--c:#d64545" onclick="T=['WO'];rgs()">Week Off</button><button class="${T[0]=='L'?'on':''}" style="--c:#6b7280" onclick="T=['L'];rgs()">Leave</button></div><div class="mu" style="margin-top:8px">Pick one or more shifts, then Apply. The days from start to end are filled with that shift.</div><div class="bt"><button onclick="cl()">Cancel</button><button class="pr" onclick="ra()">Apply ${T.join('+')}</button></div></div>`;$('#sh').hidden=false}
+function ra(){const n=new Date(S.ym[0],S.ym[1]+1,0).getDate();let a=Math.max(1,Math.min(n,fr||1)),b=Math.max(1,Math.min(n,to||1));if(a>b)[a,b]=[b,a];if(!T.length){alert('Pick a shift first');return}RA=[a,b];RC=true;rgs()}
+function rcf(){const[a,b]=RA;let k=0;for(let d=a;d<=b;d++)if(P().d[key(d)])k++;$('#sh').innerHTML=`<div class="bd" onclick="cl()"></div><div class="sp"><b>Please confirm</b><p>Fill <b>${a}${b>a?' to '+b:''} ${mname()}</b> with <b>${T.join('+')}</b>?</p><p class="mu">${b-a+1} day${b>a?'s':''}${k?`. ${k} of them already ${k>1?'have shifts that will be replaced':'has a shift that will be replaced'}.`:'.'}</p><div class="bt"><button onclick="cl()">Cancel</button><button class="pr" onclick="rd()">Confirm</button></div></div>`;$('#sh').hidden=false}
+function rd(){const[a,b]=RA;for(let d=a;d<=b;d++)P().d[key(d)]=[...T];cl();R()}
+function cl(){RC=false;$('#sh').hidden=true}
+function pk(v){if(v.length)P().d[key(D)]=[...v];else delete P().d[key(D)];cl();R()}
+function sum(){const s=stats(),p=P(),a=new Date(S.ym[0],S.ym[1]+1,10),days=Math.ceil((a-new Date())/864e5);
+let h=`<div class="mh"><button onclick="mv(-1)">‹</button><b>${mname()} ${S.ym[0]}</b><button onclick="mv(1)">›</button></div><div class="card hero"><div class="mu">Total hours</div><div class="big">${s.h} hrs</div><p>Working days <b>${s.work}</b> (without week off)<br>With week off &amp; leave <b>${s.work+s.wo+s.lv}</b><br>Week off <b>${s.wo}</b> · Leave <b>${s.lv}</b></p></div><div class="card"><h3>Shift wise</h3><table><tr><th>Shift</th><th>Days</th><th>Hours</th></tr>`+Object.entries(s.g).map(([l,x])=>`<tr><td>${esc(l)}</td><td>${x.n}</td><td>${x.h}</td></tr>`).join('')+`</table></div><div class="card"><h3>Salary</h3>`;
+h+=salCard(p,s);
+return h+`<p class="mu">Salary window: 10–13 ${new Date(a).toLocaleString('en',{month:'long'})}${days>0?` · ${days} days to go`:''}</p></div>`+ntc()+ev()}
+function txt(){const m=S.ym[1]+1,yy=String(S.ym[0]).slice(2),ps=S.all?S.p:[P()];let t=`${mname()} ${S.ym[0]}`;ps.forEach(p=>{t+='\n\n'+(S.all?p.name+'\n':'')+mon(p).map(([d,v])=>`${pad(d)}/${pad(m)}/${yy} - ${lab(v)}`).join('\n');if(S.inc){const s=stats(p);t+=`\n\nWorking days: ${s.work}\nWeek off: ${s.wo}\nLeave: ${s.lv}\nTotal hours: ${s.h}`}});return t}
+function shr(){return `<div class="mh"><button onclick="mv(-1)">‹</button><b>${mname()} ${S.ym[0]}</b><button onclick="mv(1)">›</button></div><div class="card"><label><input type="checkbox" style="width:auto" ${S.inc?'checked':''} onchange="S.inc=this.checked;R()"> Add summary at the end</label>${S.p.length>1?`<br><label><input type="checkbox" style="width:auto" ${S.all?'checked':''} onchange="S.all=this.checked;R()"> Include everyone (${S.p.length} people)</label>`:''}<textarea id="tx" style="margin-top:8px">${esc(txt())}</textarea><div class="row"><button class="pr" onclick="cp()">Copy</button><button onclick="wa()">WhatsApp</button></div><div class="mu" id="msg"></div></div>`}
+function cp(){const t=$('#tx');t.select();try{navigator.clipboard.writeText(t.value)}catch(e){document.execCommand('copy')}$('#msg').textContent='Copied'}
+function wa(){window.open('https://wa.me/?text='+encodeURIComponent($('#tx').value),'_blank')}
+function set(){const p=P();return `<div class="card"><h3>Person</h3><div class="row"><input value="${esc(p.name)}" oninput="P().name=this.value;save()" placeholder="Name / job"></div><div class="row"><input type="number" value="${p.rate||''}" oninput="P().rate=+this.value;save()" placeholder="Starting ₹ per hour (optional)"></div>${S.p.length>1?`<button onclick="if(confirm('Delete this person and all their shifts?')){S.p.splice(S.cur,1);S.cur=0;R()}">Delete this person</button>`:''}</div>
+<div class="card"><h3>Shifts for ${esc(p.name)}</h3><div class="mu">Start, end, paid hours</div>`+p.shifts.map((s,i)=>`<div class="row"><b style="flex:0 0 28px;color:${s.c}">${esc(s.k)}</b><input type="time" value="${s.s}" oninput="P().shifts[${i}].s=this.value;save()"><input type="time" value="${s.e}" oninput="P().shifts[${i}].e=this.value;save()"><input type="number" style="max-width:64px" value="${s.h}" oninput="P().shifts[${i}].h=+this.value;save()"><button onclick="rs(${i})">✕</button></div>`).join('')+`<div class="row"><input id="nk" maxlength="3" placeholder="New shift name (e.g. D)"><button onclick="as()">Add shift</button></div>
+<div class="mu" style="margin-top:8px">Combo hours (when not a simple sum), e.g. A+B=15, B+C=17</div><input value="${esc(Object.entries(p.combos).map(([k,v])=>k+'='+v).join(', '))}" onchange="cb(this.value)"></div>
+<div class="card"><h3>Reminders (phone pop-up)</h3><div class="mu">Adds a repeating event to Google Calendar. You get a phone pop-up even when the app is closed.</div><div class="row"><input id="rt" type="time" value="21:00"></div><div class="row"><button class="pr" onclick="rm(0)">Daily: note today, check tomorrow</button></div><div class="row"><button onclick="rm(1)">Month end: send to manager</button></div></div>
+<div class="card"><h3>Add another person</h3><div class="row"><input id="np" placeholder="Name / job"><button class="pr" onclick="ap()">Add</button></div></div>
+<div class="card"><h3>Import from notes</h3><div class="mu">Paste lines like 02/09/26 - A+B shift. Day and month are read from each line, the year comes from the calendar month shown.</div><textarea id="im"></textarea><button class="pr" onclick="im()">Import</button> <span class="mu" id="imm"></span></div>
+${U?`<div class="card"><button onclick="auth.signOut()">Sign out (${esc(U.email)})</button></div>`:''}<div class="card"><h3>Backup</h3><div class="mu">Data is stored in this phone's browser. Copy the backup text and keep it safe.</div><textarea id="bk"></textarea><div class="row"><button onclick="$('#bk').value=JSON.stringify(S)">Show backup</button><button onclick="rb()">Restore from box</button></div></div>`}
+function as(){const k=$('#nk').value.trim().toUpperCase();if(!k||P().shifts.some(s=>s.k==k))return;P().shifts.push({k,s:'09:00',e:'18:00',h:9,c:pal[P().shifts.length%pal.length]});R()}
+function rs(i){if(confirm('Remove this shift?')){P().shifts.splice(i,1);R()}}
+function cb(t){const o={};t.split(',').forEach(x=>{const[a,b]=x.split('=');if(a&&b&&!isNaN(+b))o[a.trim().toUpperCase()]=+b});P().combos=o;save()}
+function ap(){const n=$('#np').value.trim();if(!n)return;S.p.push({name:n,shifts:defShifts(),combos:{},rate:0,d:{}});S.cur=S.p.length-1;R()}
+function im(){const p=P();let c=0;$('#im').value.split('\n').forEach(l=>{const m=l.match(/(\d{1,2})\/(\d{1,2})\/\d{2,4}\s*-\s*(.+)/);if(!m)return;const d=+m[1],mo=+m[2];if(mo!=S.ym[1]+1)return;const t=m[3].toLowerCase();let v;if(/week|\bwo\b|off/.test(t))v=['WO'];else if(/leave|^l\b/.test(t))v=['L'];else{const ks=[...t.replace(/shift/g,'').toUpperCase()].filter(x=>p.shifts.some(s=>s.k==x));v=p.shifts.map(s=>s.k).filter(k=>ks.includes(k))}if(v.length){p.d[key(d)]=v;c++}});$('#imm').textContent=c+' days imported for '+mname();save()}
+function rb(){try{const o=JSON.parse($('#bk').value);if(o&&o.p){S=o;R()}}catch(e){alert('Backup text is not valid')}}
+function R(){const t=S.tab;let h=BRAND+(window.FBERR?'<div class="card" style="color:#d64545">Could not load Firebase (internet or ad-blocker). Data is saved only on this phone for now.</div>':'')+`<div class="top">`+S.p.map((q,i)=>`<button class="chip ${i==S.cur?'on':''}" onclick="S.cur=${i};R()">${esc(q.name)}</button>`).join('')+`</div>`;
+h+={cal,sum,shr,set}[t]();$('#app').innerHTML=h;['cal','sum','shr','set'].forEach(x=>$('#n-'+x).className=x==t?'on':'');save()}
+const firebaseConfig={apiKey:"AIzaSyAhne7ynuZJJQjR5rOTeR712UCmJZJt7Oc",authDomain:"shift-tracker-app-16dc0.firebaseapp.com",projectId:"shift-tracker-app-16dc0",appId:"1:399952995417:web:ea33b3476961436b99fd48"};
+function LG(m){$('nav').style.display='none';$('#app').innerHTML=`<div class="card lg"><img src="icon.svg" alt=""><h1>Duty Diary</h1><div class="mu">Track your shifts, hours and salary.<br>Sign in with email to see your data on any phone.</div><div class="row" style="margin-top:18px"><input id="em" type="email" placeholder="Email"></div><div class="row"><input id="pw" type="password" placeholder="Password (6+ characters)"></div><div class="row"><button class="pr" onclick="au(0)">Sign in</button><button onclick="au(1)">Create account</button></div><div class="mu" style="margin:8px 0">${m||'New here? Tap Create account.'}</div><button onclick="fp()">Forgot password</button></div>`}
+function au(n){const e=$('#em').value,p=$('#pw').value;(n?auth.createUserWithEmailAndPassword(e,p):auth.signInWithEmailAndPassword(e,p)).catch(x=>LG(esc(x.message)))}
+function fp(){auth.sendPasswordResetEmail($('#em').value).then(()=>LG('Password reset mail sent')).catch(x=>LG(esc(x.message)))}
+mig();if(typeof firebase==='undefined'||firebaseConfig.apiKey.startsWith('PASTE')){window.FBERR=typeof firebase==='undefined';R()}
+else{firebase.initializeApp(firebaseConfig);auth=firebase.auth();db=firebase.firestore();
+auth.onAuthStateChanged(async u=>{if(!u){U=null;if(U0){try{localStorage.removeItem('shiftTracker')}catch(e){}location.reload();return}LG();return}
+U=u;U0=true;const ref=db.collection('users').doc(u.uid);
+try{const d=await ref.get();if(d.exists){S=JSON.parse(d.data().s);mig()}else await ref.set({s:JSON.stringify(S)})}catch(e){}
+$('nav').style.display='flex';R()})}
+</script></body></html>
