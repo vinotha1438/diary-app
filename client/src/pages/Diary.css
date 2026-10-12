@@ -477,3 +477,49 @@
   color: var(--text);
   font-size: 14px;
 }
+
+/* ---------- mobile cleanup v2 (keep at the very end) ---------- */
+@media (max-width: 820px) {
+  /* plain paper; ruled lines only under the text */
+  .pk-page {
+    background-image: none;
+    padding: 18px 14px 16px;
+  }
+  .pk-page::before { display: none; }
+
+  .pk-text,
+  .pk .pk-write {
+    font-size: 22px;
+    line-height: 32px;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 31px,
+      var(--rule) 31px,
+      var(--rule) 32px
+    );
+    background-attachment: local;
+  }
+  .pk .pk-write { min-height: 96px; }
+
+  /* header */
+  .pk-top { gap: 4px; }
+  .pk-tag { font-size: 18px; }
+  .pk-stats { flex-wrap: wrap; row-gap: 6px; }
+
+  /* day tabs scroll sideways */
+  .pk-tabs { padding-bottom: 6px; }
+
+  /* emoji bar: one scrollable row */
+  .pk-tapadd { display: none; }
+  .pk-emoji-bar { flex-wrap: nowrap; overflow-x: auto; }
+  .pk-emoji { flex-shrink: 0; min-width: 40px; min-height: 40px; }
+  .pk-picker { max-width: 100%; overflow: hidden; }
+
+  /* easy-to-tap buttons */
+  .pk-nav button { flex: 1; min-height: 40px; }
+  .pk-add button { min-height: 44px; }
+  .pk-link { padding: 6px 4px; font-size: 13px; }
+
+  .pk-moments { gap: 12px; }
+}
